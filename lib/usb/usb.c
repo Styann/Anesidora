@@ -257,8 +257,10 @@ void usb_handle_setup_packet(usb_device_t *const device, volatile struct usb_set
                         usb_handle_config_descriptor(device, pkt->wLength);
                         break;
                     case USB_DESCRIPTOR_TYPE_STRING:
-                        usb_handle_string_descriptor(device, pkt->wValue & 0xFF, pkt->wIndex);
+                        usb_handle_string_descriptor(device, pkt->wValue & 0xFF, pkt->wIndex, pkt->wLength);
                         break;
+                    default:
+                        usb_acknowledge_out_request(device);
                 }
             }
 
@@ -272,21 +274,29 @@ void usb_handle_setup_packet(usb_device_t *const device, volatile struct usb_set
                 case USB_REQUEST_SET_REPORT:
                     set_report_callback(usb_get_endpoint(device, 0x81u)->data_buffer, pkt->wLength);
                     break;
+                default:
+                    usb_acknowledge_out_request(device);
             }
 
             break;
         }
         case EP_IN_HID: {
-            if (pkt->bRequest == USB_REQUEST_GET_DESCRIPTOR) {
-                const uint16_t descriptor_type = pkt->wValue >> 8;
+            switch (pkt->bRequest) {
+                case USB_REQUEST_GET_DESCRIPTOR: {
+                    const uint16_t descriptor_type = pkt->wValue >> 8;
 
-                if (descriptor_type == USB_DESCRIPTOR_TYPE_REPORT) {
-                    usb_handle_hid_report(pkt->bRequest, pkt->wIndex, pkt->wLength);
+                    if (descriptor_type == USB_DESCRIPTOR_TYPE_REPORT) {
+                        usb_handle_hid_report(U16_LOW(pkt->wValue), pkt->wIndex, pkt->wLength);
+                    }
                 }
+                default:
+                    usb_acknowledge_out_request(device);
             }
 
             break;
         }
+        default:
+            usb_acknowledge_out_request(device);
     }
 }
 
@@ -382,16 +392,20 @@ void usb_handle_device_descriptor(usb_device_t *const device, const uint16_t wLe
  * @param descriptorIndex
  * @param languageId
  */
-void usb_handle_string_descriptor(usb_device_t *const device, const uint8_t descriptorIndex, const uint16_t languageId) {
+void usb_handle_string_descriptor(usb_device_t *const device, const uint8_t descriptorIndex, const uint16_t languageId, const uint16_t wLength) {
     if (descriptorIndex == 0) {
-        usb_xfer_ep0_in(device, (uint8_t *)device->language_descriptor, 4);
+        usb_xfer_ep0_in(device, (uint8_t *)device->language_descriptor, sizeof(device->language_descriptor));
     }
     else {
-        char const **string = (descriptorIndex == 1) ? &device->vendor : &device->product;
+        char const *const *string = (descriptorIndex == 1) ? &device->vendor : &device->product;
         const uint string_len = strlen(*string);
-        const uint8_t bLength = 2 + string_len * 2;
+
+        uint8_t bLength = 2 + string_len * 2;
+        if (bLength % 2) bLength++;
 
         uint16_t string_descriptor_buffer[127];
+        memset(string_descriptor_buffer, 0, sizeof(string_descriptor_buffer));
+
         string_descriptor_buffer[0] = USB_DESCRIPTOR_TYPE_STRING << 8 | bLength;
         utf8_to_utf16(*string, string_len, &string_descriptor_buffer[1]);
 

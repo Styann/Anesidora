@@ -67,11 +67,11 @@ typedef struct {
 
     struct usb_endpoint endpoints[3];
 
-    const struct usb_device_descriptor *device_descriptor;
-    const struct usb_configuration_descriptor *configuration_descriptor;
-    const struct usb_string_language_descriptor *language_descriptor;
-    const char *vendor;
-    const char *product;
+    const struct usb_device_descriptor *const device_descriptor;
+    const struct usb_configuration_descriptor *const configuration_descriptor;
+    const struct usb_string_language_descriptor *const language_descriptor;
+    const char *const vendor;
+    const char *const product;
 } usb_device_t;
 
 #endif

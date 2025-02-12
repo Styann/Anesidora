@@ -4,10 +4,11 @@
 
 #include "rotary_encoder.h"
 
-#include "../pico_extra/pico_extra.h"
 #include "hardware/gpio.h"
 
-void rotary_encoder_init(rotary_encoder_t *self, bool use_internal_pull_up) {
+#include "../pico_extra/pico_extra.h"
+
+void rotary_encoder_init(rotary_encoder_t *const self, const bool use_internal_pull_up) {
     self->state = 0;
     self->state_CLK = LOW;
 
@@ -27,7 +28,7 @@ void rotary_encoder_init(rotary_encoder_t *self, bool use_internal_pull_up) {
  * @brief read and return direction
  * @returns {int8_t} clockwise: 1, unmoving: 0, counter_clockwise: -1
  */
-int8_t rotary_encoder_read(rotary_encoder_t *self) {
+int8_t rotary_encoder_read(rotary_encoder_t *const self) {
     const bool last_state_CLK = self->state_CLK;
     self->state_CLK = gpio_get(self->pin_CLK);
 
@@ -46,7 +47,7 @@ int8_t rotary_encoder_read(rotary_encoder_t *self) {
 /**
  * @brief read direction, then execute cw or ccw callback
  */
-void rotary_encoder_task(rotary_encoder_t *self) {
+void rotary_encoder_task(rotary_encoder_t *const self) {
     const bool last_state_CLK = self->state_CLK;
     self->state_CLK = gpio_get(self->pin_CLK);
 

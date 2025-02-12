@@ -49,9 +49,9 @@ void isr_usbctrl_task(usb_device_t *const device);
 
         void usb_handle_config_descriptor(usb_device_t *const device, const uint16_t wLength) __attribute__((weak));
 
-        void usb_handle_string_descriptor(usb_device_t *const device, const uint8_t descriptorIndex, const uint16_t languageId);
+        void usb_handle_string_descriptor(usb_device_t *const device, const uint8_t descriptorIndex, const uint16_t languageId, const uint16_t wLength);
 
-        extern void usb_handle_hid_report(const uint16_t bDescriptorIndex, const uint16_t wInterfaceNumber, const uint16_t wDescriptorLength);
+        extern void usb_handle_hid_report(const uint8_t bDescriptorIndex, const uint16_t wInterfaceNumber, const uint16_t wDescriptorLength);
 
     static void usb_handle_buff_status(usb_device_t *const device);
 

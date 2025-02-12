@@ -33,15 +33,12 @@
 #define USE_SSD1306
 
 enum multicore_flags {
-    BONGOCAT_TAP_FLAG = 0xC0,
+    BONGOCAT_TAP_FLAG = 1,
     BONGOCAT_PAWS_UP_FLAG,
     USB_SUSPEND_FLAG,
     USB_RESUME_FLAG,
     LEDS_CHANGE_COLOR
 };
-
-volatile uint8_t modifiers = 0b00000000;
-volatile bool is_fn_pressed = false;
 
 void ep0_out_handler(uint8_t *buf, uint16_t len);
 void ep0_in_handler(uint8_t *buf, uint16_t len);
@@ -80,8 +77,8 @@ usb_device_t pico = {
     .device_descriptor = &device_descriptor,
     .configuration_descriptor = &config_descriptor,
     .language_descriptor = &language_descriptor,
-    .vendor = "Seegson Electronics",
-    .product = "USB Keyboard",
+    .vendor = "Seegson Electronics Corp.",
+    .product = "Anesidora Keyboard",
 };
 
 void ep0_out_handler(uint8_t *buf, uint16_t len) {
@@ -109,11 +106,9 @@ struct usb_hid_interface keyboard_interface = {
     .endpoint = &pico.endpoints[2]
 };
 
-void usb_handle_hid_report(const uint16_t bDescriptorIndex, const uint16_t wInterfaceNumber, const uint16_t wDescriptorLength) {
-    switch (wInterfaceNumber) {
-        case 0:
-            usb_xfer_ep0_in(&pico, (uint8_t *)keyboard_report_descriptor, sizeof(keyboard_report_descriptor));
-            break;
+void usb_handle_hid_report(const uint8_t bDescriptorIndex, const uint16_t wInterfaceNumber, const uint16_t wDescriptorLength) {
+    if (bDescriptorIndex == 0 && wInterfaceNumber == 0) {
+        usb_xfer_ep0_in(&pico, (uint8_t *)keyboard_report_descriptor, sizeof(keyboard_report_descriptor));
     }
 }
 
@@ -131,13 +126,21 @@ void usb_handle_config_descriptor(usb_device_t *const device, const uint16_t wLe
     usb_xfer_ep0_in(device, buffer, buffer_ptr - buffer);
 }
 
-struct usb_endpoint *const keyboard_ep = &pico.endpoints[2];
+struct usb_endpoint *const hid_ep = &pico.endpoints[2];
 
 /**
  * @brief USB interrupt handler
  */
 void isr_usbctrl(void) {
     isr_usbctrl_task(&pico);
+}
+
+void usb_suspend_callback(void) {
+    multicore_fifo_push_blocking(USB_SUSPEND_FLAG);
+}
+
+void usb_resume_callback(void) {
+    multicore_fifo_push_blocking(USB_RESUME_FLAG);
 }
 
 #ifdef USE_CAPSLOCK_LED
@@ -167,9 +170,12 @@ struct ws2812b led_strip = {
 };
 #endif
 
+volatile uint8_t modifiers = 0b00000000;
+volatile bool fn_key = false;
+
 #ifdef USE_KNOB
-void knob_cw_callback(uint32_t state);
-void knob_ccw_callback(uint32_t state);
+void knob_ccw_callback(const uint32_t state);
+void knob_cw_callback(const uint32_t state);
 
 rotary_encoder_t volume_knob = {
     .pin_DT = GPIO22,
@@ -178,53 +184,102 @@ rotary_encoder_t volume_knob = {
     .ccw_callback = &knob_ccw_callback
 };
 
-void knob_cw_callback(uint32_t state) {
-    usb_send_consumer_control(keyboard_ep, CC_VOLUME_INCREMENT);
+void knob_ccw_callback(const uint32_t state) {
+    if (fn_key) {
+        usb_send_consumer_control(hid_ep, CC_BRIGHTNESS_DECREMENT);
+    }
+    else {
+        usb_send_consumer_control(hid_ep, CC_VOLUME_DECREMENT);
+    }
 }
 
-void knob_ccw_callback(uint32_t state) {
-    usb_send_consumer_control(keyboard_ep, CC_VOLUME_DECREMENT);
+void knob_cw_callback(const uint32_t state) {
+    if (fn_key) {
+        usb_send_consumer_control(hid_ep, CC_BRIGHTNESS_INCREMENT);
+    }
+    else {
+        usb_send_consumer_control(hid_ep, CC_VOLUME_INCREMENT);
+    }
 }
 #endif
 
 #ifdef USE_KEYBOARD
 #define DEBOUNCE_MS 10
-#define LAYOUT_COLUMN_SIZE 8
-#define LAYOUT_ROW_SIZE 9
+#define LAYOUT_COLUMN_LENGTH 8
+#define LAYOUT_ROW_LENGTH 9
 
-const uint8_t columns_pins[LAYOUT_COLUMN_SIZE] = { GPIO0, GPIO1, GPIO2, GPIO3, GPIO4, GPIO5, GPIO6, GPIO7 };
-const uint8_t rows_pins[LAYOUT_ROW_SIZE] = { GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO13, GPIO14, GPIO15, GPIO18 };
+const uint8_t columns_pins[LAYOUT_COLUMN_LENGTH] = { GPIO0, GPIO1, GPIO2, GPIO3, GPIO4, GPIO5, GPIO6, GPIO7 };
+const uint8_t rows_pins[LAYOUT_ROW_LENGTH] = { GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO13, GPIO14, GPIO15, GPIO18 };
 
-const uint8_t layout[LAYOUT_ROW_SIZE][LAYOUT_COLUMN_SIZE] = {
-    { KC_ESCAPE,     KC_1,        KC_2,         KC_3,                   KC_4,                    KC_5,         KC_6,           KC_7          },
-    { KC_TAB,        KC_Q,        KC_W,         KC_E,                   KC_R,                    KC_T,         KC_Y,           KC_U          },
-    { KC_CAPS_LOCK,  KC_A,        KC_S,         KC_D,                   KC_F,                    KC_G,         KC_H,           KC_J          },
-    { KC_SHIFT_LEFT, KC_Z,        KC_X,         KC_C,                   KC_V,                    KC_B,         KC_N,           KC_M          },
-    { KC_CTRL_LEFT,  KC_GUI_LEFT, KC_ALT_LEFT,  KC_SPACE,               KC_ALT_RIGHT,            KC_FN,        KC_CTRL_RIGHT,  KC_ARROW_LEFT },
-    { KC_8,          KC_9,        KC_0,         KC_MINUS,               KC_EQUAL,                KC_BACKSPACE, KC_GRAVE,       KC_PAUSE      },
-    { KC_I,          KC_O,        KC_P,         KC_SQUARE_BRACKET_LEFT, KC_SQUARE_BRACKET_RIGHT, KC_BACKSLASH, KC_DELETE,      KC_NONE       },
-    { KC_K,          KC_L,        KC_SEMICOLON, KC_APOSTROPHE,          KC_ENTER,                KC_HOME,      KC_ARROW_RIGHT, KC_NONE       },
-    { KC_COMMA,      KC_PERIOD,   KC_SLASH,     KC_SHIFT_RIGHT,         KC_ARROW_UP,             KC_END,       KC_ARROW_DOWN , KC_NONE       },
+const uint8_t layout[LAYOUT_ROW_LENGTH][LAYOUT_COLUMN_LENGTH] = {
+    { KC_ESCAPE,     KC_1,        KC_2,        KC_3,                   KC_4,                    KC_5,         KC_6,           KC_7          },
+    { KC_TAB,        KC_A,        KC_Z,        KC_E,                   KC_R,                    KC_T,         KC_Y,           KC_U          },
+    { KC_CAPS_LOCK,  KC_Q,        KC_S,        KC_D,                   KC_F,                    KC_G,         KC_H,           KC_J          },
+    { KC_SHIFT_LEFT, KC_W,        KC_X,        KC_C,                   KC_V,                    KC_B,         KC_N,           KC_SEMICOLON  },
+    { KC_CTRL_LEFT,  KC_ALT_LEFT, KC_GUI_LEFT, KC_SPACE,               KC_ALT_RIGHT,            KC_FN,        KC_CTRL_RIGHT,  KC_ARROW_LEFT },
+    { KC_8,          KC_9,        KC_0,        KC_MINUS,               KC_EQUAL,                KC_BACKSPACE, KC_GRAVE,       KC_PAUSE      },
+    { KC_I,          KC_O,        KC_P,        KC_SQUARE_BRACKET_LEFT, KC_SQUARE_BRACKET_RIGHT, KC_BACKSLASH, KC_DELETE,      KC_NONE       },
+    { KC_K,          KC_L,        KC_M,        KC_APOSTROPHE,          KC_ENTER,                KC_PAGE_UP,   KC_ARROW_RIGHT, KC_NONE       },
+    { KC_COMMA,      KC_PERIOD,   KC_SLASH,    KC_SHIFT_RIGHT,         KC_ARROW_UP,             KC_PAGE_DOWN, KC_ARROW_DOWN , KC_NONE       },
 };
 
-keyboard_matrix_t keyboard_matrix = {
+const keyboard_matrix_t keyboard_matrix = {
     .layout = &layout[0][0],
     .columns_pins = columns_pins,
     .rows_pins = rows_pins,
-    .row_length = LAYOUT_ROW_SIZE,
-    .column_length = LAYOUT_COLUMN_SIZE
+    .row_length = LAYOUT_ROW_LENGTH,
+    .column_length = LAYOUT_COLUMN_LENGTH
 };
 
-bool macro_task(struct usb_keyboard_report *report) {
-    modifiers = report->modifiers;
+/**
+ * @returns
+ */
+bool macro_task(struct usb_keyboard_report *report, const bool fn_key) {
+    bool match = false;
 
-    if (report->keycodes[0] == KC_FN && report->keycodes[1] == KC_L) {
-        multicore_fifo_drain();
-        multicore_fifo_push_blocking(LEDS_CHANGE_COLOR);
-        return true;
+    if (fn_key) {
+        switch (report->keycodes[0]) {
+            case KC_PAGE_UP:
+                report->keycodes[0] = KC_HOME;
+                break;
+            case KC_PAGE_DOWN:
+                report->keycodes[0] = KC_END;
+                break;
+            case KC_S:
+                report->keycodes[0] = KC_PRINT_SCREEN;
+                break;
+            case KC_I:
+                report->keycodes[0] = KC_F12; // to toggle inspector in browser
+                break;
+            case KC_F:
+                report->keycodes[0] = KC_F11;
+                break;
+            case KC_L:
+                multicore_fifo_push_blocking(LEDS_CHANGE_COLOR);
+                match = true;
+                break;
+            case KC_P:
+                usb_send_consumer_control(hid_ep, CC_PLAY_PAUSE);
+                match = true;
+                break;
+            case KC_PERIOD:
+                usb_send_consumer_control(hid_ep, CC_NEXT_TRACK);
+                match = true;
+                break;
+            case KC_COMMA:
+                usb_send_consumer_control(hid_ep, CC_PREVIOUS_TRACK);
+                match = true;
+                break;
+        }
+    }
+    else {
+        if (report->keycodes[0] == KC_PAUSE) {
+            usb_send_consumer_control(hid_ep, CC_PLAY_PAUSE);
+            match = true;
+        }
     }
 
-    return false;
+    return match;
 }
 
 void keyboard_task(void) {
@@ -234,27 +289,31 @@ void keyboard_task(void) {
         static bool can_release = false;
         static struct usb_keyboard_report previous_report = { 0x01, 0, 0, { 0, 0, 0, 0, 0, 0 }};
 
-        struct usb_keyboard_report keyboard_report = { 0x01, 0, 0, { 0, 0, 0, 0, 0, 0 } };
-        const bool is_empty = keyboard_matrix_scan(&keyboard_matrix, &keyboard_report);
+        struct usb_keyboard_report keyboard_report = keyboard_matrix_scan(&keyboard_matrix, &fn_key);
+
+        modifiers = keyboard_report.modifiers;
 
         // if there is a change between actual and previous report
         if (!keyboard_report_cmp(&keyboard_report, &previous_report)) {
-            if (!macro_task(&keyboard_report)) {
-                if (!is_empty) {
-                    usb_send_keyboard_report(keyboard_ep, &keyboard_report);
+            if (!macro_task(&keyboard_report, fn_key)) {
+                if (!is_keyboard_report_empty(&keyboard_report)) {
+                    if (pico.suspended) {
+                        usb_resume_callback();
+                        pico.suspended = false;
+                    }
+
+                    usb_send_keyboard_report(hid_ep, &keyboard_report);
                     can_release = true;
 
                     #ifdef USE_SSD1306
-                    multicore_fifo_drain();
                     multicore_fifo_push_blocking(BONGOCAT_TAP_FLAG);
                     #endif
                 }
                 else if (can_release) {
-                    release_keyboard(keyboard_ep);
+                    release_keyboard(hid_ep);
                     can_release = false;
 
                     #ifdef USE_SSD1306
-                    multicore_fifo_drain();
                     multicore_fifo_push_blocking(BONGOCAT_PAWS_UP_FLAG);
                     #endif
                 }
@@ -267,6 +326,8 @@ void keyboard_task(void) {
 #endif
 
 void main_core1(void) {
+    uint8_t color_index = 0;
+
     const struct grb colors[] = {
         grb(255, 0, 0),
         grb(251, 255, 0), // yellow
@@ -277,8 +338,6 @@ void main_core1(void) {
     };
 
     core1_resume: {
-        uint32_t multicore_flag = 0;
-
         #ifdef USE_SSD1306
         ssd1306_init(&output, 400000);
         ssd1306_write_all(&output, bongocat_paws_up);
@@ -287,49 +346,40 @@ void main_core1(void) {
         #endif
 
         #ifdef USE_WS2812B
-        uint8_t color_index = 0;
         ws2812b_init(&led_strip);
         ws2812b_set_all(&led_strip, colors[color_index]);
         ws2812b_write(&led_strip);
         #endif
 
         while (true) {
-            if (multicore_fifo_rvalid()) {
-                multicore_flag = multicore_fifo_pop_blocking();
-            }
+            uint32_t multicore_flag = (multicore_fifo_rvalid()) ? multicore_fifo_pop_blocking() : 0;
 
-            if (multicore_flag == USB_SUSPEND_FLAG) {
-                multicore_flag = 0;
-                goto core1_suspend;
-            }
-
-            #ifdef USE_SSD1306
             switch (multicore_flag) {
+                case USB_SUSPEND_FLAG:
+                    goto core1_suspend;
+                    break;
                 case BONGOCAT_TAP_FLAG:
+                    #ifdef USE_SSD1306
                     ssd1306_write_all(&output, bongocat_paw_down[bongocat_paw_state]);
                     bongocat_paw_state ^= 1;
                     multicore_flag = 0;
+                    #endif
                     break;
                 case BONGOCAT_PAWS_UP_FLAG:
+                    #ifdef USE_SSD1306
                     ssd1306_write_all(&output, bongocat_paws_up);
                     multicore_flag = 0;
                     break;
-            }
-            #endif
-
-            #ifdef USE_WS2812B
-            switch (multicore_flag) {
+                    #endif
                 case LEDS_CHANGE_COLOR:
+                    #ifdef USE_WS2812B
                     color_index++;
                     if (color_index > (lengthof(colors) - 1)) color_index = 0;
 
                     ws2812b_set_all(&led_strip, colors[color_index]);
                     ws2812b_write(&led_strip);
-
-                    multicore_flag = 0;
-                    break;
+                    #endif
             }
-            #endif
         }
     }
 
@@ -355,7 +405,7 @@ void main_core1(void) {
 }
 
 void set_report_callback(volatile uint8_t *buf, uint16_t len) {
-    release_keyboard(keyboard_ep);
+    // release_keyboard(hid_ep);
 
     // #ifdef USE_CAPSLOCK_LED
     // led_toggle(&capslock_led);
@@ -373,16 +423,6 @@ void set_report_callback(volatile uint8_t *buf, uint16_t len) {
         // sprintf(str, "%d", len);
         // uart_puts(uart0, str);
     // }
-}
-
-void usb_suspend_callback(void) {
-    multicore_fifo_drain();
-    multicore_fifo_push_blocking(USB_SUSPEND_FLAG);
-}
-
-void usb_resume_callback(void) {
-    multicore_fifo_drain();
-    multicore_fifo_push_blocking(USB_RESUME_FLAG);
 }
 
 int main(void) {
