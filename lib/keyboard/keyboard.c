@@ -12,19 +12,17 @@
 #include "../pico_extra/pico_extra.h"
 #include "../usb/usb.h"
 
-#define KRO 6 // number of keycodes in usb keyboard report
-
 /**
  * @brief Set all rows pins as OUPUT and HIGH then all columns pins as GPIO INPUT PULL UP
  */
 void keyboard_matrix_init(const keyboard_matrix_t *const self) {
-    for (uint16_t i = 0; i < self->row_length; i++) {
+    for (uint i = 0; i < self->row_length; i++) {
         gpio_init(self->rows_pins[i]);
         gpio_set_dir(self->rows_pins[i], GPIO_OUT);
         gpio_put(self->rows_pins[i], HIGH);
     }
 
-    for (uint16_t i = 0; i < self->column_length; i++) {
+    for (uint i = 0; i < self->column_length; i++) {
         gpio_init(self->columns_pins[i]);
         gpio_set_dir(self->columns_pins[i], GPIO_IN);
         gpio_pull_up(self->columns_pins[i]);
@@ -34,32 +32,29 @@ void keyboard_matrix_init(const keyboard_matrix_t *const self) {
 /**
  * @brief loop through the matrix and add pressed keys to a keyboard report
  * @param matrix
- * @param fn_key - return if the fn key is pressed or not
+ * @param handle_key_callback
  */
-struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const self, volatile bool *const fn_key) {
+struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const self) {
     struct usb_keyboard_report report = { 0x01, 0, 0, { 0, 0, 0, 0, 0, 0 } };
-    *fn_key = false;
     uint8_t keycodes_length = 0;
 
-    for (uint8_t row_i = 0; (keycodes_length < KRO) && (row_i < self->row_length); row_i++) {
+    for (uint row_i = 0; (keycodes_length < sizeof(report.keycodes)) && (row_i < self->row_length); row_i++) {
         gpio_put(self->rows_pins[row_i], LOW); // low output pin act as a ground
         busy_wait_us_32(5); // waiting for the trace to be physically low
 
-        for (uint8_t column_i = 0; (keycodes_length < KRO) && (column_i < self->column_length); column_i++) {
+        for (uint column_i = 0; (keycodes_length < sizeof(report.keycodes)) && (column_i < self->column_length); column_i++) {
             if (!gpio_get(self->columns_pins[column_i])) {
                 const uint8_t keycode = self->layout[row_i * self->column_length + column_i];
 
-                if (keycode != KC_NONE) {
-                    if (keycode >= KC_CTRL_LEFT && keycode <= KC_GUI_RIGHT) {
-                        report.modifiers |= get_modifier_from_keycode(keycode);
-                    }
-                    else if (keycode == KC_FN) {
-                        *fn_key = true;
-                    }
-                    else {
-                        push_keycode(&report, keycode);
-                        keycodes_length++;
-                    }
+                if (keycode == KC_NONE) {
+                    continue;
+                }
+                else if (keycode >= KC_CTRL_LEFT && keycode <= KC_GUI_RIGHT) {
+                    report.modifiers |= get_modifier_from_keycode(keycode);
+                }
+                else {
+                    push_keycode(&report, keycode);
+                    keycodes_length++;
                 }
             }
         }
@@ -84,7 +79,7 @@ static uint8_t get_modifier_from_keycode(const uint8_t keycode) {
  * @param keycode
  */
 static void push_keycode(struct usb_keyboard_report *const report, const uint8_t keycode) {
-     for (uint8_t i = 0; i < KRO; i++) {
+     for (uint8_t i = 0; i < sizeof(report->keycodes); i++) {
         if (report->keycodes[i] == KC_NONE) {
             report->keycodes[i] = keycode;
             break;
@@ -99,7 +94,7 @@ static void push_keycode(struct usb_keyboard_report *const report, const uint8_t
 bool is_keyboard_report_empty(const struct usb_keyboard_report *const report) {
     if (report->modifiers != MOD_NONE) return false;
 
-    for (uint8_t i = 0; i < KRO; i++) {
+    for (uint8_t i = 0; i < sizeof(report->keycodes); i++) {
         if (report->keycodes[i] != KC_NONE) return false;
     }
 

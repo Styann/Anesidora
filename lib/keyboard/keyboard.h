@@ -8,19 +8,17 @@
 #include "pico/stdlib.h"
 #include "../usb/usb_hid.h"
 
-#define KC_FN 0xA5 // 0xA5 is reserved, so I can use it as FN key
-
 typedef struct {
     const uint8_t *const layout;
     const uint8_t *const rows_pins;
     const uint8_t *const columns_pins;
-    const uint16_t row_length;
-    const uint16_t column_length;
+    const uint row_length;
+    const uint column_length;
 } keyboard_matrix_t;
 
 void keyboard_matrix_init(const keyboard_matrix_t *const self);
 
-struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const self, volatile bool *const fn_key);
+struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const self);
 
 static uint8_t get_modifier_from_keycode(const uint8_t keycode);
 

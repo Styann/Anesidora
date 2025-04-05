@@ -3,6 +3,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
@@ -37,7 +38,8 @@ enum multicore_flags {
     BONGOCAT_PAWS_UP_FLAG,
     USB_SUSPEND_FLAG,
     USB_RESUME_FLAG,
-    LEDS_CHANGE_COLOR
+    LEDS_CHANGE_COLOR,
+    GAME_MODE
 };
 
 void ep0_out_handler(uint8_t *buf, uint16_t len);
@@ -204,14 +206,15 @@ void knob_cw_callback(const uint32_t state) {
 #endif
 
 #ifdef USE_KEYBOARD
-#define DEBOUNCE_MS 10
+#define KC_FN 0xA5 // 0xA5 is reserved, so I can use it as FN key
+#define DEBOUNCE_MS 8
 #define LAYOUT_COLUMN_LENGTH 8
 #define LAYOUT_ROW_LENGTH 9
 
 const uint8_t columns_pins[LAYOUT_COLUMN_LENGTH] = { GPIO0, GPIO1, GPIO2, GPIO3, GPIO4, GPIO5, GPIO6, GPIO7 };
 const uint8_t rows_pins[LAYOUT_ROW_LENGTH] = { GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO13, GPIO14, GPIO15, GPIO18 };
 
-const uint8_t layout[LAYOUT_ROW_LENGTH][LAYOUT_COLUMN_LENGTH] = {
+uint8_t layout[LAYOUT_ROW_LENGTH][LAYOUT_COLUMN_LENGTH] = {
     { KC_ESCAPE,     KC_1,        KC_2,        KC_3,                   KC_4,                    KC_5,         KC_6,           KC_7          },
     { KC_TAB,        KC_A,        KC_Z,        KC_E,                   KC_R,                    KC_T,         KC_Y,           KC_U          },
     { KC_CAPS_LOCK,  KC_Q,        KC_S,        KC_D,                   KC_F,                    KC_G,         KC_H,           KC_J          },
@@ -231,10 +234,27 @@ const keyboard_matrix_t keyboard_matrix = {
     .column_length = LAYOUT_COLUMN_LENGTH
 };
 
+void handle_fn_key(struct usb_keyboard_report *const report) {
+    fn_key = false;
+
+    for (uint8_t i = 0; i < sizeof(report->keycodes); i++) {
+        if (report->keycodes[i] == KC_FN) {
+            report->keycodes[i] = KC_NONE;
+            fn_key = true;
+
+            for (uint8_t j = i; j < (sizeof(report->keycodes) - 1); j++) {
+                report->keycodes[j] = report->keycodes[j + 1];
+            }
+
+            break;
+        }
+    }
+}
+
 /**
- * @returns
+ * @returns {bool} if true, should not send report
  */
-bool macro_task(struct usb_keyboard_report *report, const bool fn_key) {
+bool macro_task(struct usb_keyboard_report *report) {
     bool match = false;
 
     if (fn_key) {
@@ -252,7 +272,12 @@ bool macro_task(struct usb_keyboard_report *report, const bool fn_key) {
                 report->keycodes[0] = KC_F12; // to toggle inspector in browser
                 break;
             case KC_F:
-                report->keycodes[0] = KC_F11;
+                report->keycodes[0] = KC_F11; // fullscreen
+                break;
+            case KC_G:
+                layout[4][2] = (layout[4][2] == KC_GUI_LEFT) ? KC_ALT_RIGHT : KC_GUI_LEFT;
+                multicore_fifo_push_blocking(GAME_MODE);
+                match = true;
                 break;
             case KC_L:
                 multicore_fifo_push_blocking(LEDS_CHANGE_COLOR);
@@ -270,6 +295,10 @@ bool macro_task(struct usb_keyboard_report *report, const bool fn_key) {
                 usb_send_consumer_control(hid_ep, CC_PREVIOUS_TRACK);
                 match = true;
                 break;
+            default:
+                if (report->keycodes[0] >= KC_1 && report->keycodes[0] <= KC_0) {
+                    report->keycodes[0] += (KC_F1 - KC_1);
+                }
         }
     }
     else {
@@ -289,13 +318,14 @@ void keyboard_task(void) {
         static bool can_release = false;
         static struct usb_keyboard_report previous_report = { 0x01, 0, 0, { 0, 0, 0, 0, 0, 0 }};
 
-        struct usb_keyboard_report keyboard_report = keyboard_matrix_scan(&keyboard_matrix, &fn_key);
+        struct usb_keyboard_report keyboard_report = keyboard_matrix_scan(&keyboard_matrix);
 
+        handle_fn_key(&keyboard_report);
         modifiers = keyboard_report.modifiers;
 
         // if there is a change between actual and previous report
         if (!keyboard_report_cmp(&keyboard_report, &previous_report)) {
-            if (!macro_task(&keyboard_report, fn_key)) {
+            if (!macro_task(&keyboard_report)) {
                 if (!is_keyboard_report_empty(&keyboard_report)) {
                     if (pico.suspended) {
                         usb_resume_callback();
@@ -327,6 +357,7 @@ void keyboard_task(void) {
 
 void main_core1(void) {
     uint8_t color_index = 0;
+    bool game_mode = false;
 
     const struct grb colors[] = {
         grb(255, 0, 0),
@@ -379,6 +410,20 @@ void main_core1(void) {
                     ws2812b_set_all(&led_strip, colors[color_index]);
                     ws2812b_write(&led_strip);
                     #endif
+                    break;
+                case GAME_MODE:
+                    #ifdef USE_SSD1306
+                    ssd1306_set_addr(&output, 3, 0);
+
+                    if (game_mode) {
+                        ssd1306_print(&output, " ");
+                        game_mode = false;
+                    }
+                    else {
+                        ssd1306_print(&output, "G");
+                        game_mode = true;
+                    }
+                    #endif
             }
         }
     }
@@ -405,24 +450,7 @@ void main_core1(void) {
 }
 
 void set_report_callback(volatile uint8_t *buf, uint16_t len) {
-    // release_keyboard(hid_ep);
-
-    // #ifdef USE_CAPSLOCK_LED
-    // led_toggle(&capslock_led);
-    // #endif
-
-    // char str[2];
-
-    // if (len == 1) {
-        // usb_control_xfer(&pico, NULL, 0);
-        // sprintf(str, "%d", len);
-        // uart_puts(uart0, str);
-    // }
-    // else {
-        // usb_control_xfer(&pico, NULL, 0);
-        // sprintf(str, "%d", len);
-        // uart_puts(uart0, str);
-    // }
+    usb_acknowledge_out_request(&pico);
 }
 
 int main(void) {
