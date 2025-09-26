@@ -46,10 +46,10 @@ struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const s
             if (!gpio_get(self->columns_pins[column_i])) {
                 const uint8_t keycode = self->layout[row_i * self->column_length + column_i];
 
-                if (keycode == KC_NONE) {
+                if (keycode == USB_KEY_NONE) {
                     continue;
                 }
-                else if (keycode >= KC_CTRL_LEFT && keycode <= KC_GUI_RIGHT) {
+                else if (keycode >= USB_KEY_CTRL_LEFT && keycode <= USB_KEY_GUI_RIGHT) {
                     report.modifiers |= get_modifier_from_keycode(keycode);
                 }
                 else {
@@ -67,7 +67,7 @@ struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const s
 
 /**
  * @brief take a keycode and return his modifier if he has one
- * @param keycode must be between KC_CTRL_LEFT (0xE0) and KC_GUI_RIGHT (0xE7)
+ * @param keycode must be between USB_KEY_CTRL_LEFT (0xE0) and USB_KEY_GUI_RIGHT (0xE7)
  */
 static uint8_t get_modifier_from_keycode(const uint8_t keycode) {
     return (0x01 << (keycode & 0b00001111));
@@ -80,7 +80,7 @@ static uint8_t get_modifier_from_keycode(const uint8_t keycode) {
  */
 static void push_keycode(struct usb_keyboard_report *const report, const uint8_t keycode) {
      for (uint8_t i = 0; i < sizeof(report->keycodes); i++) {
-        if (report->keycodes[i] == KC_NONE) {
+        if (report->keycodes[i] == USB_KEY_NONE) {
             report->keycodes[i] = keycode;
             break;
         }
@@ -92,10 +92,10 @@ static void push_keycode(struct usb_keyboard_report *const report, const uint8_t
  * @param keyboard_report
  */
 bool is_keyboard_report_empty(const struct usb_keyboard_report *const report) {
-    if (report->modifiers != MOD_NONE) return false;
+    if (report->modifiers != USB_KEY_MODIFIER_NONE) return false;
 
     for (uint8_t i = 0; i < sizeof(report->keycodes); i++) {
-        if (report->keycodes[i] != KC_NONE) return false;
+        if (report->keycodes[i] != USB_KEY_NONE) return false;
     }
 
     return true;

@@ -188,25 +188,25 @@ rotary_encoder_t volume_knob = {
 
 void knob_ccw_callback(const uint32_t state) {
     if (fn_key) {
-        usb_send_consumer_control(hid_ep, CC_BRIGHTNESS_DECREMENT);
+        usb_send_consumer_control(hid_ep, USB_CONSUMER_CONTROL_BRIGHTNESS_DECREMENT);
     }
     else {
-        usb_send_consumer_control(hid_ep, CC_VOLUME_DECREMENT);
+        usb_send_consumer_control(hid_ep, USB_CONSUMER_CONTROL_VOLUME_DECREMENT);
     }
 }
 
 void knob_cw_callback(const uint32_t state) {
     if (fn_key) {
-        usb_send_consumer_control(hid_ep, CC_BRIGHTNESS_INCREMENT);
+        usb_send_consumer_control(hid_ep, USB_CONSUMER_CONTROL_BRIGHTNESS_INCREMENT);
     }
     else {
-        usb_send_consumer_control(hid_ep, CC_VOLUME_INCREMENT);
+        usb_send_consumer_control(hid_ep, USB_CONSUMER_CONTROL_VOLUME_INCREMENT);
     }
 }
 #endif
 
 #ifdef USE_KEYBOARD
-#define KC_FN 0xA5 // 0xA5 is reserved, so I can use it as FN key
+#define USB_KEY_FN 0xA5 // 0xA5 is reserved, so I can use it as FN key
 #define DEBOUNCE_MS 8
 #define LAYOUT_COLUMN_LENGTH 8
 #define LAYOUT_ROW_LENGTH 9
@@ -215,15 +215,15 @@ const uint8_t columns_pins[LAYOUT_COLUMN_LENGTH] = { GPIO0, GPIO1, GPIO2, GPIO3,
 const uint8_t rows_pins[LAYOUT_ROW_LENGTH] = { GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO13, GPIO14, GPIO15, GPIO18 };
 
 uint8_t layout[LAYOUT_ROW_LENGTH][LAYOUT_COLUMN_LENGTH] = {
-    { KC_ESCAPE,     KC_1,        KC_2,        KC_3,                   KC_4,                    KC_5,         KC_6,           KC_7          },
-    { KC_TAB,        KC_A,        KC_Z,        KC_E,                   KC_R,                    KC_T,         KC_Y,           KC_U          },
-    { KC_CAPS_LOCK,  KC_Q,        KC_S,        KC_D,                   KC_F,                    KC_G,         KC_H,           KC_J          },
-    { KC_SHIFT_LEFT, KC_W,        KC_X,        KC_C,                   KC_V,                    KC_B,         KC_N,           KC_SEMICOLON  },
-    { KC_CTRL_LEFT,  KC_ALT_LEFT, KC_GUI_LEFT, KC_SPACE,               KC_ALT_RIGHT,            KC_FN,        KC_CTRL_RIGHT,  KC_ARROW_LEFT },
-    { KC_8,          KC_9,        KC_0,        KC_MINUS,               KC_EQUAL,                KC_BACKSPACE, KC_GRAVE,       KC_PAUSE      },
-    { KC_I,          KC_O,        KC_P,        KC_SQUARE_BRACKET_LEFT, KC_SQUARE_BRACKET_RIGHT, KC_BACKSLASH, KC_DELETE,      KC_NONE       },
-    { KC_K,          KC_L,        KC_M,        KC_APOSTROPHE,          KC_ENTER,                KC_PAGE_UP,   KC_ARROW_RIGHT, KC_NONE       },
-    { KC_COMMA,      KC_PERIOD,   KC_SLASH,    KC_SHIFT_RIGHT,         KC_ARROW_UP,             KC_PAGE_DOWN, KC_ARROW_DOWN , KC_NONE       },
+    { USB_KEY_ESCAPE,     USB_KEY_1,        USB_KEY_2,        USB_KEY_3,                   USB_KEY_4,                    USB_KEY_5,         USB_KEY_6,           USB_KEY_7          },
+    { USB_KEY_TAB,        USB_KEY_A,        USB_KEY_Z,        USB_KEY_E,                   USB_KEY_R,                    USB_KEY_T,         USB_KEY_Y,           USB_KEY_U          },
+    { USB_KEY_CAPS_LOCK,  USB_KEY_Q,        USB_KEY_S,        USB_KEY_D,                   USB_KEY_F,                    USB_KEY_G,         USB_KEY_H,           USB_KEY_J          },
+    { USB_KEY_SHIFT_LEFT, USB_KEY_W,        USB_KEY_X,        USB_KEY_C,                   USB_KEY_V,                    USB_KEY_B,         USB_KEY_N,           USB_KEY_SEMICOLON  },
+    { USB_KEY_CTRL_LEFT,  USB_KEY_ALT_LEFT, USB_KEY_GUI_LEFT, USB_KEY_SPACE,               USB_KEY_ALT_RIGHT,            USB_KEY_FN,        USB_KEY_CTRL_RIGHT,  USB_KEY_ARROW_LEFT },
+    { USB_KEY_8,          USB_KEY_9,        USB_KEY_0,        USB_KEY_MINUS,               USB_KEY_EQUAL,                USB_KEY_BACKSPACE, USB_KEY_GRAVE,       USB_KEY_PAUSE      },
+    { USB_KEY_I,          USB_KEY_O,        USB_KEY_P,        USB_KEY_SQUARE_BRACKET_LEFT, USB_KEY_SQUARE_BRACKET_RIGHT, USB_KEY_BACKSLASH, USB_KEY_DELETE,      USB_KEY_NONE       },
+    { USB_KEY_K,          USB_KEY_L,        USB_KEY_M,        USB_KEY_APOSTROPHE,          USB_KEY_ENTER,                USB_KEY_PAGE_UP,   USB_KEY_ARROW_RIGHT, USB_KEY_NONE       },
+    { USB_KEY_COMMA,      USB_KEY_PERIOD,   USB_KEY_SLASH,    USB_KEY_SHIFT_RIGHT,         USB_KEY_ARROW_UP,             USB_KEY_PAGE_DOWN, USB_KEY_ARROW_DOWN , USB_KEY_NONE       },
 };
 
 const keyboard_matrix_t keyboard_matrix = {
@@ -238,8 +238,8 @@ void handle_fn_key(struct usb_keyboard_report *const report) {
     fn_key = false;
 
     for (uint8_t i = 0; i < sizeof(report->keycodes); i++) {
-        if (report->keycodes[i] == KC_FN) {
-            report->keycodes[i] = KC_NONE;
+        if (report->keycodes[i] == USB_KEY_FN) {
+            report->keycodes[i] = USB_KEY_NONE;
             fn_key = true;
 
             for (uint8_t j = i; j < (sizeof(report->keycodes) - 1); j++) {
@@ -259,51 +259,51 @@ bool macro_task(struct usb_keyboard_report *report) {
 
     if (fn_key) {
         switch (report->keycodes[0]) {
-            case KC_PAGE_UP:
-                report->keycodes[0] = KC_HOME;
+            case USB_KEY_PAGE_UP:
+                report->keycodes[0] = USB_KEY_HOME;
                 break;
-            case KC_PAGE_DOWN:
-                report->keycodes[0] = KC_END;
+            case USB_KEY_PAGE_DOWN:
+                report->keycodes[0] = USB_KEY_END;
                 break;
-            case KC_S:
-                report->keycodes[0] = KC_PRINT_SCREEN;
+            case USB_KEY_S:
+                report->keycodes[0] = USB_KEY_PRINT_SCREEN;
                 break;
-            case KC_I:
-                report->keycodes[0] = KC_F12; // to toggle inspector in browser
+            case USB_KEY_I:
+                report->keycodes[0] = USB_KEY_F12; // to toggle inspector in browser
                 break;
-            case KC_F:
-                report->keycodes[0] = KC_F11; // fullscreen
+            case USB_KEY_F:
+                report->keycodes[0] = USB_KEY_F11; // fullscreen
                 break;
-            case KC_G:
-                layout[4][2] = (layout[4][2] == KC_GUI_LEFT) ? KC_ALT_RIGHT : KC_GUI_LEFT;
+            case USB_KEY_G:
+                layout[4][2] = (layout[4][2] == USB_KEY_GUI_LEFT) ? USB_KEY_ALT_RIGHT : USB_KEY_GUI_LEFT;
                 multicore_fifo_push_blocking(GAME_MODE);
                 match = true;
                 break;
-            case KC_L:
+            case USB_KEY_L:
                 multicore_fifo_push_blocking(LEDS_CHANGE_COLOR);
                 match = true;
                 break;
-            case KC_P:
-                usb_send_consumer_control(hid_ep, CC_PLAY_PAUSE);
+            case USB_KEY_P:
+                usb_send_consumer_control(hid_ep, USB_CONSUMER_CONTROL_PLAY_PAUSE);
                 match = true;
                 break;
-            case KC_PERIOD:
-                usb_send_consumer_control(hid_ep, CC_NEXT_TRACK);
+            case USB_KEY_PERIOD:
+                usb_send_consumer_control(hid_ep, USB_CONSUMER_CONTROL_NEXT_TRACK);
                 match = true;
                 break;
-            case KC_COMMA:
-                usb_send_consumer_control(hid_ep, CC_PREVIOUS_TRACK);
+            case USB_KEY_COMMA:
+                usb_send_consumer_control(hid_ep, USB_CONSUMER_CONTROL_PREVIOUS_TRACK);
                 match = true;
                 break;
             default:
-                if (report->keycodes[0] >= KC_1 && report->keycodes[0] <= KC_0) {
-                    report->keycodes[0] += (KC_F1 - KC_1);
+                if (report->keycodes[0] >= USB_KEY_1 && report->keycodes[0] <= USB_KEY_0) {
+                    report->keycodes[0] += (USB_KEY_F1 - USB_KEY_1);
                 }
         }
     }
     else {
-        if (report->keycodes[0] == KC_PAUSE) {
-            usb_send_consumer_control(hid_ep, CC_PLAY_PAUSE);
+        if (report->keycodes[0] == USB_KEY_PAUSE) {
+            usb_send_consumer_control(hid_ep, USB_CONSUMER_CONTROL_PLAY_PAUSE);
             match = true;
         }
     }
@@ -378,7 +378,6 @@ void main_core1(void) {
 
         #ifdef USE_WS2812B
         ws2812b_init(&led_strip);
-        ws2812b_set_all(&led_strip, colors[color_index]);
         ws2812b_write(&led_strip);
         #endif
 

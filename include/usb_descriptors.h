@@ -99,8 +99,8 @@ const uint8_t keyboard_report_descriptor[] = {
             // keyboard
             USAGE_PAGE, KEYBOARD_KEYPAD_PAGE,
                 // modifier field
-                USAGE_MINIMUM, KC_CTRL_LEFT,
-                USAGE_MAXIMUM, KC_GUI_RIGHT,
+                USAGE_MINIMUM, USB_KEY_CTRL_LEFT,
+                USAGE_MAXIMUM, USB_KEY_GUI_RIGHT,
                 LOGICAL_MINIMUM, 0x00,
                 LOGICAL_MAXIMUM, 0x01,
                 REPORT_SIZE, 0x01,
