@@ -45,7 +45,7 @@ void release_keyboard(struct usb_endpoint *const endpoint);
 
 void usb_send_consumer_control_report(struct usb_endpoint *const endpoint, const struct usb_consumer_control_report *const report);
 
-void usb_send_consumer_control(struct usb_endpoint *const endpoicodcnt, const uint16_t consumer_control);
+void usb_send_consumer_control(struct usb_endpoint *const endpoint, const uint16_t consumer_control);
 
 void usb_send_gamepad_report(struct usb_endpoint *const endpoint, const struct usb_gamepad_report *const report);
 

@@ -122,18 +122,17 @@ const uint8_t keyboard_report_descriptor[] = {
                 USAGE_MAXIMUM, 0xFF,
                 INPUT, DATA_ARRAY_ABS,
 
-            REPORT_ID, 0xC5,
-
-            // led
-            // USAGE_PAGE, LED_PAGE,
-            //     USAGE_MINIMUM, 0x01,
-            //     USAGE_MAXIMUM, 0x05,
-            //     REPORT_SIZE, 0x01,
-            //     REPORT_COUNT, 0x05,
-            //     OUTPUT, DATA_VAR_ABS,
-            //     REPORT_SIZE, 0x03,
-            //     REPORT_COUNT, 0x01,
-            //     OUTPUT, CONST_ARRAY_ABS,
+            // led (output report, shares REPORT_ID 0x01 with the keyboard input)
+            USAGE_PAGE, LED_PAGE,
+                USAGE_MINIMUM, USB_LED_NUM_LOCK,
+                USAGE_MAXIMUM, USB_LED_KANA,
+                REPORT_SIZE, 0x01,
+                REPORT_COUNT, 0x05,
+                OUTPUT, DATA_VAR_ABS,
+                // padding to align the report on a full byte
+                REPORT_SIZE, 0x03,
+                REPORT_COUNT, 0x01,
+                OUTPUT, CONST_ARRAY_ABS,
     END_COLLECTION,
 
     USAGE_PAGE, CONSUMER_PAGE,

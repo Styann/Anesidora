@@ -13,6 +13,28 @@
 #include "../usb/usb.h"
 
 /**
+ * @brief take a keycode and return his modifier if he has one
+ * @param keycode must be between USB_KEY_CTRL_LEFT (0xE0) and USB_KEY_GUI_RIGHT (0xE7)
+ */
+static uint8_t get_modifier_from_keycode(const uint8_t keycode) {
+    return (0x01 << (keycode & 0b00001111));
+}
+
+/**
+ * @brief push it into keycodes array
+ * @param report
+ * @param keycode
+ */
+static void push_keycode(struct usb_keyboard_report *const report, const uint8_t keycode) {
+    for (uint8_t i = 0; i < sizeof(report->keycodes); i++) {
+        if (report->keycodes[i] == USB_KEY_NONE) {
+            report->keycodes[i] = keycode;
+            break;
+        }
+    }
+}
+
+/**
  * @brief Set all rows pins as OUPUT and HIGH then all columns pins as GPIO INPUT PULL UP
  */
 void keyboard_matrix_init(const keyboard_matrix_t *const self) {
@@ -63,28 +85,6 @@ struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const s
     }
 
     return report;
-}
-
-/**
- * @brief take a keycode and return his modifier if he has one
- * @param keycode must be between USB_KEY_CTRL_LEFT (0xE0) and USB_KEY_GUI_RIGHT (0xE7)
- */
-static uint8_t get_modifier_from_keycode(const uint8_t keycode) {
-    return (0x01 << (keycode & 0b00001111));
-}
-
-/**
- * @brief push it into keycodes array
- * @param report
- * @param keycode
- */
-static void push_keycode(struct usb_keyboard_report *const report, const uint8_t keycode) {
-     for (uint8_t i = 0; i < sizeof(report->keycodes); i++) {
-        if (report->keycodes[i] == USB_KEY_NONE) {
-            report->keycodes[i] = keycode;
-            break;
-        }
-    }
 }
 
 /**

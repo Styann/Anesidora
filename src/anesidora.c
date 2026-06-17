@@ -399,8 +399,8 @@ void main_core1(void) {
                     #ifdef USE_SSD1306
                     ssd1306_write_all(&output, bongocat_paws_up);
                     multicore_flag = 0;
-                    break;
                     #endif
+                    break;
                 case LEDS_CHANGE_COLOR:
                     #ifdef USE_WS2812B
                     color_index++;
@@ -449,7 +449,15 @@ void main_core1(void) {
 }
 
 void set_report_callback(volatile uint8_t *buf, uint16_t len) {
-    usb_acknowledge_out_request(&pico);
+    #ifdef USE_CAPSLOCK_LED
+    if (len > 0) {
+        // Report data is the last byte: hosts may or may not prefix the report id.
+        // Caps Lock is the second LED bit (Num Lock being the first).
+        const uint8_t leds = buf[len - 1];
+        const uint8_t caps_lock_mask = 1u << (USB_LED_CAPS_LOCK - USB_LED_NUM_LOCK);
+        led_put(&capslock_led, leds & caps_lock_mask);
+    }
+    #endif
 }
 
 int main(void) {

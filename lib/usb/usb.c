@@ -272,7 +272,13 @@ void usb_handle_setup_packet(usb_device_t *const device, volatile struct usb_set
                     usb_acknowledge_out_request(device);
                     break;
                 case USB_REQUEST_SET_REPORT:
-                    set_report_callback(usb_get_endpoint(device, 0x81u)->data_buffer, pkt->wLength);
+                    // The report data (e.g. keyboard LED state) is not in the setup
+                    // packet: it arrives in a following DATA OUT stage on EP0. Arm
+                    // EP0 OUT to receive it; the data stage always starts with DATA1.
+                    struct usb_endpoint *const ep0_out = usb_get_endpoint(device, USB_DIR_OUT);
+                    ep0_out->next_pid = 1;
+                    device->set_report_pending = true;
+                    usb_xfer(ep0_out, NULL, pkt->wLength);
                     break;
                 default:
                     usb_acknowledge_out_request(device);
@@ -435,13 +441,24 @@ static void usb_handle_ep_buff_done(struct usb_endpoint *ep) {
 static void usb_handle_buff_done(usb_device_t *const device, uint ep_num, bool in) {
     const uint8_t ep_addr = (in ? USB_DIR_IN : USB_DIR_OUT) | ep_num ;
 
-    for (uint i = 0; i < lengthof(device->endpoints); i++) {
-        struct usb_endpoint *const ep = &(device->endpoints[i]);
-
-        if (ep->descriptor && ep->handler) {
-            if (ep->descriptor->bEndpointAddress == ep_addr) {
-                usb_handle_ep_buff_done(ep);
-                return;
+    // Data stage of a pending SET_REPORT (e.g. keyboard LED state) just completed
+    // on EP0 OUT. Hand the report to the callback, then send the status stage.
+    if (device->set_report_pending && ep_addr == USB_DIR_OUT) {
+        device->set_report_pending = false;
+        struct usb_endpoint *const ep0_out = usb_get_endpoint(device, USB_DIR_OUT);
+        const uint16_t len = *ep0_out->buffer_control & USB_BUF_CTRL_LEN_MASK;
+        set_report_callback(ep0_out->data_buffer, len);
+        usb_acknowledge_out_request(device);
+    }
+    else {
+        for (uint i = 0; i < lengthof(device->endpoints); i++) {
+            struct usb_endpoint *const ep = &(device->endpoints[i]);
+    
+            if (ep->descriptor && ep->handler) {
+                if (ep->descriptor->bEndpointAddress == ep_addr) {
+                    usb_handle_ep_buff_done(ep);
+                    return;
+                }
             }
         }
     }

@@ -20,10 +20,6 @@ void keyboard_matrix_init(const keyboard_matrix_t *const self);
 
 struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const self);
 
-static uint8_t get_modifier_from_keycode(const uint8_t keycode);
-
-static void push_keycode(struct usb_keyboard_report *const report, const uint8_t keycode);
-
 bool is_keyboard_report_empty(const struct usb_keyboard_report *const report);
 
 bool keyboard_report_cmp(const struct usb_keyboard_report *const x, const struct usb_keyboard_report *const y);

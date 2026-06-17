@@ -64,6 +64,8 @@ typedef struct {
     bool should_set_addr;
     volatile bool configured;
     volatile bool suspended;
+    // a SET_REPORT setup packet was received and its data stage is pending on EP0 OUT
+    volatile bool set_report_pending;
 
     struct usb_endpoint endpoints[3];
 
