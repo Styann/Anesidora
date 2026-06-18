@@ -12,8 +12,7 @@ void led_put(led_t *const led, const bool state) {
 }
 
 void led_toggle(led_t *const led) {
-    const bool new_state = !(led->state);
-    led_put(led, new_state);
+    led_put(led, !led->state);
 }
 
 void led_on(led_t *const led) {

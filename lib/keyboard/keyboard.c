@@ -68,15 +68,14 @@ struct usb_keyboard_report keyboard_matrix_scan(const keyboard_matrix_t *const s
             if (!gpio_get(self->columns_pins[column_i])) {
                 const uint8_t keycode = self->layout[row_i * self->column_length + column_i];
 
-                if (keycode == USB_KEY_NONE) {
-                    continue;
-                }
-                else if (keycode >= USB_KEY_CTRL_LEFT && keycode <= USB_KEY_GUI_RIGHT) {
-                    report.modifiers |= get_modifier_from_keycode(keycode);
-                }
-                else {
-                    push_keycode(&report, keycode);
-                    keycodes_length++;
+                if (keycode != USB_KEY_NONE) {
+                    if (keycode >= USB_KEY_CTRL_LEFT && keycode <= USB_KEY_GUI_RIGHT) {
+                        report.modifiers |= get_modifier_from_keycode(keycode);
+                    }
+                    else {
+                        push_keycode(&report, keycode);
+                        keycodes_length++;
+                    }
                 }
             }
         }
@@ -102,9 +101,5 @@ bool is_keyboard_report_empty(const struct usb_keyboard_report *const report) {
 }
 
 bool keyboard_report_cmp(const struct usb_keyboard_report *const x, const struct usb_keyboard_report *const y) {
-    return (memcmp(x, y, sizeof(struct usb_keyboard_report)) == 0) ? true : false;
-}
-
-bool is_gamepad_report_empty(const struct usb_gamepad_report *const report) {
-    return !(report->x | report->y | report->buttons);
+    return (memcmp(x, y, sizeof(struct usb_keyboard_report)) == 0);
 }
