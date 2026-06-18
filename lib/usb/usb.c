@@ -417,19 +417,18 @@ static void usb_handle_ep_buff_done(struct usb_endpoint *ep) {
     // transfer next packet if there is remaining data to send
     if (ep->xfer_remaining > 0) {
         const uint16_t pkt_size = MIN(ep->xfer_remaining, ep->descriptor->wMaxPacketSize);
-        const uint8_t *const buf = ep->xfer_buf;
-        ep->xfer_remaining -= pkt_size;
-        usb_xfer_pkt(ep, buf, pkt_size);
+        usb_xfer_pkt(ep, ep->xfer_buf, pkt_size);
         ep->xfer_buf += pkt_size;
-        return;
+        ep->xfer_remaining -= pkt_size;
     }
-
-    uint32_t buffer_control = *ep->buffer_control;
-    // Get the transfer length for this endpoint
-    uint16_t len = buffer_control & USB_BUF_CTRL_LEN_MASK;
-
-    // Call that endpoints buffer done handler
-    ep->handler((uint8_t*)ep->data_buffer, len);
+    else {
+        uint32_t buffer_control = *ep->buffer_control;
+        // Get the transfer length for this endpoint
+        uint16_t len = buffer_control & USB_BUF_CTRL_LEN_MASK;
+    
+        // Call that endpoints buffer done handler
+        ep->handler((uint8_t*)ep->data_buffer, len);
+    }
 }
 
 /**
