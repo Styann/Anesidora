@@ -114,9 +114,12 @@ void usb_handle_hid_report(const uint8_t bDescriptorIndex, const uint16_t wInter
     }
 }
 
+// Fire-and-forget EP0 transfers send the config descriptor across several
+// IRQs, so the assembly buffer must outlive usb_handle_config_descriptor.
+static uint8_t config_descriptor_buffer[128];
+
 void usb_handle_config_descriptor(usb_device_t *const device, const uint16_t wLength) {
-    uint8_t buffer[128];
-    uint8_t *buffer_ptr = buffer;
+    uint8_t *buffer_ptr = config_descriptor_buffer;
 
     memcpy((void *)buffer_ptr, device->configuration_descriptor, device->configuration_descriptor->bLength);
     buffer_ptr += device->configuration_descriptor->bLength;
@@ -125,7 +128,7 @@ void usb_handle_config_descriptor(usb_device_t *const device, const uint16_t wLe
         buffer_ptr += hid_interface_cpy(buffer_ptr, &keyboard_interface);
     }
 
-    usb_xfer_ep0_in(device, buffer, buffer_ptr - buffer);
+    usb_xfer_ep0_in(device, config_descriptor_buffer, buffer_ptr - config_descriptor_buffer);
 }
 
 struct usb_endpoint *const hid_ep = &pico.endpoints[2];

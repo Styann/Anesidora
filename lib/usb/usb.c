@@ -150,25 +150,15 @@ void usb_xfer_pkt(struct usb_endpoint *ep, const uint8_t *buf, uint16_t len) {
  * @param len
  */
 void usb_xfer(struct usb_endpoint *ep, const uint8_t *buf, const uint16_t len) {
-    if (len == 0) {
-        usb_xfer_pkt(ep, buf, len);
-    }
+    const uint16_t pkt_size = MIN(len, ep->descriptor->wMaxPacketSize);
 
-    uint16_t remaining_len = len;
-    size_t ep_buf_size = ep->descriptor->wMaxPacketSize;
+    // Fire and forget: send the first packet and stash the remainder. The
+    // buffer-status IRQ drives the rest, so we never block inside the ISR.
+    // (len == 0 sends a zero-length packet with nothing left over.)
+    ep->xfer_buf = buf + pkt_size;
+    ep->xfer_remaining = len - pkt_size;
 
-    while (remaining_len > 0) {
-        size_t pkt_size = MIN(remaining_len, ep_buf_size);
-
-        usb_xfer_pkt(ep, buf, pkt_size);
-
-        while (*ep->buffer_control & USB_BUF_CTRL_FULL) {
-            tight_loop_contents();
-        }
-
-        buf += pkt_size;
-        remaining_len -= pkt_size;
-    }
+    usb_xfer_pkt(ep, buf, pkt_size);
 }
 
 void usb_control_xfer(usb_device_t *const device, uint8_t *buf, uint16_t len) {
@@ -424,6 +414,16 @@ void usb_handle_string_descriptor(usb_device_t *const device, const uint8_t desc
  * @param ep, the endpoint to notify.
  */
 static void usb_handle_ep_buff_done(struct usb_endpoint *ep) {
+    // transfer next packet if there is remaining data to send
+    if (ep->xfer_remaining > 0) {
+        const uint16_t pkt_size = MIN(ep->xfer_remaining, ep->descriptor->wMaxPacketSize);
+        const uint8_t *const buf = ep->xfer_buf;
+        ep->xfer_remaining -= pkt_size;
+        usb_xfer_pkt(ep, buf, pkt_size);
+        ep->xfer_buf += pkt_size;
+        return;
+    }
+
     uint32_t buffer_control = *ep->buffer_control;
     // Get the transfer length for this endpoint
     uint16_t len = buffer_control & USB_BUF_CTRL_LEN_MASK;

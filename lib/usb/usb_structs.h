@@ -51,6 +51,12 @@ struct usb_endpoint {
 
         // Toggle after each packet (unless replying to a SETUP)
         uint8_t next_pid;
+
+        // In-flight multi-packet transfer state. usb_xfer sends the first
+        // packet and stores the rest here; the buffer-status IRQ ships the
+        // remaining packets one at a time (fire and forget, no ISR blocking).
+        const uint8_t *xfer_buf;
+        uint16_t xfer_remaining;
 };
 
 struct usb_hid_interface {
