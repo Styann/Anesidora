@@ -76,7 +76,7 @@ struct usb_endpoint *usb_get_endpoint(usb_device_t *const device, const uint8_t 
  * @return uint32_t
  */
 static inline uint32_t usb_buffer_offset(volatile uint8_t *buf) {
-    return (uint32_t) buf ^ (uint32_t) usb_dpram;
+    return (uint32_t)buf ^ (uint32_t)usb_dpram;
 }
 
 /**
@@ -84,16 +84,17 @@ static inline uint32_t usb_buffer_offset(volatile uint8_t *buf) {
  * @param ep
  */
 void usb_setup_endpoint(struct usb_endpoint *ep) {
-    // EP0 doesn't have one so return if that is the case
-    if (!ep->endpoint_control) return;
+    if (ep->endpoint_control) {
+        // Get the data buffer as an offset of the USB controller's DPRAM
+        uint32_t dpram_offset = usb_buffer_offset(ep->data_buffer);
 
-    // Get the data buffer as an offset of the USB controller's DPRAM
-    uint32_t dpram_offset = usb_buffer_offset(ep->data_buffer);
-    uint32_t reg = EP_CTRL_ENABLE_BITS
-                   | EP_CTRL_INTERRUPT_PER_BUFFER
-                   | (ep->descriptor->bmAttributes << EP_CTRL_BUFFER_TYPE_LSB)
-                   | dpram_offset;
-    *ep->endpoint_control = reg;
+        uint32_t reg = EP_CTRL_ENABLE_BITS
+                     | EP_CTRL_INTERRUPT_PER_BUFFER
+                     | (ep->descriptor->bmAttributes << EP_CTRL_BUFFER_TYPE_LSB)
+                     | dpram_offset;
+
+        *ep->endpoint_control = reg;
+    }
 }
 
 /**
@@ -111,8 +112,7 @@ void usb_setup_endpoints(usb_device_t *const device) {
  * @brief Given an endpoint configuration, returns true if the endpoint
  * is transmitting data to the host (i.e. is an IN endpoint)
  * @param ep, the endpoint configuration
- * @return true
- * @return false
+ * @return {boolean}
  */
 static inline bool ep_is_tx(struct usb_endpoint *ep) {
     return ep->descriptor->bEndpointAddress & USB_DIR_IN;
@@ -269,6 +269,7 @@ void usb_handle_setup_packet(usb_device_t *const device, volatile struct usb_set
                     ep0_out->next_pid = 1;
                     device->set_report_pending = true;
                     usb_xfer(ep0_out, NULL, pkt->wLength);
+
                     break;
                 default:
                     usb_acknowledge_out_request(device);
@@ -438,7 +439,7 @@ static void usb_handle_ep_buff_done(struct usb_endpoint *ep) {
  * @param in
  */
 static void usb_handle_buff_done(usb_device_t *const device, uint ep_num, bool in) {
-    const uint8_t ep_addr = (in ? USB_DIR_IN : USB_DIR_OUT) | ep_num ;
+    const uint8_t ep_addr = ((in) ? USB_DIR_IN : USB_DIR_OUT) | ep_num;
 
     // Data stage of a pending SET_REPORT (e.g. keyboard LED state) just completed
     // on EP0 OUT. Hand the report to the callback, then send the status stage.
@@ -473,6 +474,7 @@ static void usb_handle_buff_status(usb_device_t *const device) {
     uint32_t remaining_buffers = buffers;
 
     uint bit = 1u;
+
     for (uint i = 0; remaining_buffers && i < 3 * 2; i++) {
         if (remaining_buffers & bit) {
             // clear this in advance
@@ -481,6 +483,7 @@ static void usb_handle_buff_status(usb_device_t *const device) {
             usb_handle_buff_done(device, i >> 1u, !(i & 1u));
             remaining_buffers &= ~bit;
         }
+
         bit <<= 1u;
     }
 }

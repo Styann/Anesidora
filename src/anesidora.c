@@ -92,7 +92,8 @@ void ep0_in_handler(uint8_t *buf, uint16_t len) {
         // Set actual device address in hardware
         usb_hw->dev_addr_ctrl = pico.addr;
         pico.should_set_addr = false;
-    } else {
+    } 
+    else {
         // Receive a zero length status packet from the host on EP0 OUT
         usb_xfer(usb_get_endpoint(&pico, USB_DIR_OUT), NULL, 0);
     }
