@@ -28,24 +28,6 @@ add_executable(anesidora
     $ENV{ANESIDORA_PATH}/lib/led/led.c
 )
 
-target_sources(anesidora PUBLIC
-    $ENV{ANESIDORA_PATH}/src/anesidora.c
-    $ENV{ANESIDORA_PATH}/lib/debounce/debounce.c
-    $ENV{ANESIDORA_PATH}/lib/pico_extra/pico_extra.c
-    $ENV{ANESIDORA_PATH}/lib/keyboard/keyboard.c
-    $ENV{ANESIDORA_PATH}/lib/usb/usb.c
-    $ENV{ANESIDORA_PATH}/lib/usb/usb_hid.c
-    $ENV{ANESIDORA_PATH}/lib/rotary_encoder/rotary_encoder.c
-    $ENV{ANESIDORA_PATH}/lib/ws2812b/ws2812b.c
-    $ENV{ANESIDORA_PATH}/lib/ssd1331/ssd1331.c
-    $ENV{ANESIDORA_PATH}/lib/ssd1306/ssd1306.c
-    $ENV{ANESIDORA_PATH}/lib/st7735s/st7735s.c
-    $ENV{ANESIDORA_PATH}/lib/button/button.c
-    $ENV{ANESIDORA_PATH}/lib/joystick8way/joystick8way.c
-    $ENV{ANESIDORA_PATH}/lib/graphics/color.c
-    $ENV{ANESIDORA_PATH}/lib/led/led.c
-)
-
 target_link_libraries(anesidora
     pico_stdlib
     pico_multicore
