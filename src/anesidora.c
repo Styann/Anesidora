@@ -275,7 +275,7 @@ bool macro_task(struct usb_keyboard_report *report) {
                 report->keycodes[0] = USB_KEY_F11; // fullscreen
                 break;
             case USB_KEY_G:
-                layout[4][2] = (layout[4][2] == USB_KEY_GUI_LEFT) ? USB_KEY_ALT_RIGHT : USB_KEY_GUI_LEFT;
+                layout[4][2] = (layout[4][2] == USB_KEY_GUI_LEFT) ? USB_KEY_F13 : USB_KEY_GUI_LEFT;
                 multicore_fifo_push_blocking(GAME_MODE);
                 match = true;
                 break;
